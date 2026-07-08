@@ -3,6 +3,26 @@
 
 #include "i2c_bitaxe.h"
 
+typedef enum {
+    CHIP_EMC2101,
+    CHIP_CTF2301B
+} emc2101_chip_type_t;
+
+// CTF2301B register definitions (compatibility mode)
+#define CTF2301B_REG_CHIP_ID   0xFE
+#define CTF2301B_REG_MFG_ID    0xFF
+#define CTF2301B_REG_BETA     0x30
+#define CTF2301B_REG_NC       0x34
+#define CTF2301B_REG_ENHANCED_CONFIG 0x45
+#define CTF2301B_ENHANCED_CONFIG_PHR 0x10
+#define CTF2301B_PWM_FREQ_CODE_700HZ 0x01
+#define CTF2301B_PWM_FREQ_CODE_5K8HZ 0x1F
+#define CTF2301B_PWM_FREQ_CODE_7K2HZ 0x19
+#define CTF2301B_DIRECT_PWM_CONFIG 0x20
+
+#define CTF2301B_CHIP_ID      0x41    // CTF2301B chip ID
+#define CTF2301B_MFG_ID       0x59    // CTF2301B manufacturer ID
+
 // TODO Make all these enums
 
 #define EMC2101_BETA_11         0x00

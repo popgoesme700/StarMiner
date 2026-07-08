@@ -11,6 +11,7 @@ static i2c_master_dev_handle_t emc2101_dev_handle;
 
 static int temp_offset;
 
+static emc2101_chip_type_t chip_type = CHIP_EMC2101;
 /**
  * @brief Initialize the EMC2101 sensor.
  *
@@ -25,6 +26,19 @@ esp_err_t EMC2101_init(int temp_offset_param)
     if (i2c_bitaxe_add_device(EMC2101_I2CADDR_DEFAULT, &emc2101_dev_handle, TAG) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to add device");
         return ESP_FAIL;
+    }
+
+    // Read chip ID to detect chip type
+    uint8_t chip_id = 0, mfg_id = 0;
+    i2c_bitaxe_register_read(emc2101_dev_handle, CTF2301B_REG_CHIP_ID, &chip_id, 1);
+    i2c_bitaxe_register_read(emc2101_dev_handle, CTF2301B_REG_MFG_ID, &mfg_id, 1);
+
+    if (chip_id == CTF2301B_CHIP_ID && mfg_id == CTF2301B_MFG_ID) {
+        chip_type = CHIP_CTF2301B;
+        ESP_LOGI(TAG, "Detected CTF2301B (ChipID=0x%02X, MfgID=0x%02X)", chip_id, mfg_id);
+    } else {
+        chip_type = CHIP_EMC2101;
+        ESP_LOGI(TAG, "Detected EMC2101 (ChipID=0x%02X, MfgID=0x%02X)", chip_id, mfg_id);
     }
 
     // set the TACH input
@@ -45,6 +59,14 @@ esp_err_t EMC2101_init(int temp_offset_param)
     // //}
     
 
+    if (chip_type == CHIP_CTF2301B) {
+        uint8_t reg_config = 0;
+        ESP_RETURN_ON_ERROR(i2c_bitaxe_register_read(emc2101_dev_handle, EMC2101_REG_CONFIG, &reg_config, 1), TAG, "Failed to read config reg");
+        ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(emc2101_dev_handle, EMC2101_REG_CONFIG, reg_config | 0x02), TAG, "Failed to configure fan settings reg03");
+        ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(emc2101_dev_handle, 0x19, 0x7F), TAG, "Failed to configure fan settings reg19");
+        ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(emc2101_dev_handle, EMC2101_REG_CONFIG, reg_config), TAG, "Failed to configure fan settings reg03");
+        ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(emc2101_dev_handle, 0x21, 0x02), TAG, "Failed to configure fan settings reg21");
+    }
 
 
     // We're using default filtering and conversion, no need to set them again.
@@ -58,14 +80,26 @@ esp_err_t EMC2101_init(int temp_offset_param)
 }
 
 esp_err_t EMC2101_set_ideality_factor(uint8_t ideality){
-    //set Ideality Factor
-    ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(emc2101_dev_handle, EMC2101_IDEALITY_FACTOR, ideality), TAG, "Failed to set ideality factor");
+    if (chip_type == CHIP_CTF2301B) {
+        // CTF2301B: NC Factor table differs from EMC2101
+        // 0x24(eta=1.0319) -> 0x08(eta=1.0356) closest match
+        uint8_t nc_value = (ideality == 0x24) ? 0x08 : ideality;
+        ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(emc2101_dev_handle, CTF2301B_REG_NC, nc_value), TAG, "Failed to set NC factor");
+    } else {
+        // EMC2101: Write directly
+        ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(emc2101_dev_handle, EMC2101_IDEALITY_FACTOR, ideality), TAG, "Failed to set ideality factor");
+    }
     return ESP_OK;
 }
 
 esp_err_t EMC2101_set_beta_compensation(uint8_t beta){
-    //set Beta Compensation
-    ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(emc2101_dev_handle, EMC2101_BETA_COMPENSATION, beta), TAG, "Failed to set beta compensation");
+    if (chip_type == CHIP_CTF2301B) {
+        // CTF2301B: Write 0x30, 0x00 to disable TruTCRIT compensation
+        ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(emc2101_dev_handle, CTF2301B_REG_BETA, beta), TAG, "Failed to disable beta compensation for CTF2301B");
+    } else {
+        // EMC2101: Write the passed parameter
+        ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(emc2101_dev_handle, EMC2101_BETA_COMPENSATION, beta), TAG, "Failed to set beta compensation");
+    }
     return ESP_OK;
 }
 
