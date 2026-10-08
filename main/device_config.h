@@ -135,7 +135,7 @@ static const AsicConfig default_asic_configs[] = {
     ASIC_BM1373,
 };
 
-static const FamilyConfig FAMILY_GAMMA_V2    = { .id = GAMMA_V2,    .name = "GammaV2",    .asic = ASIC_BM1370,   .asic_count = 1, .max_power =  40, .power_offset = 5,  .nominal_voltage = 12, .voltage_domains = 1, .swarm_color = "green",    .tps546_config = &TPS546_CONFIG_DEFAULT, };
+static const FamilyConfig FAMILY_GAMMA_V2    = { .id = GAMMA_V2,    .name = "GammaV2",    .asic = ASIC_BM1370,   .asic_count = 1, .max_power =  40, .power_offset = 5,  .nominal_voltage = 12, .voltage_domains = 1, .swarm_color = "green",    .tps546_config = &TPS546_CONFIG_GAMMA_V2, };
 static const FamilyConfig FAMILY_MAX         = { .id = MAX,         .name = "Max",        .asic = ASIC_BM1397,   .asic_count = 1, .max_power =  25, .power_offset = 5,  .nominal_voltage = 5,  .voltage_domains = 1, .swarm_color = "red",      .tps546_config = &TPS546_CONFIG_DEFAULT, };
 static const FamilyConfig FAMILY_ULTRA       = { .id = ULTRA,       .name = "Ultra",      .asic = ASIC_BM1366,   .asic_count = 1, .max_power =  25, .power_offset = 5,  .nominal_voltage = 5,  .voltage_domains = 1, .swarm_color = "purple",   .tps546_config = &TPS546_CONFIG_DEFAULT, };
 static const FamilyConfig FAMILY_HEX         = { .id = HEX,         .name = "Hex",        .asic = ASIC_BM1366,   .asic_count = 6, .max_power =  90, .power_offset = 12, .nominal_voltage = 12, .voltage_domains = 3, .swarm_color = "orange",   .tps546_config = &TPS546_CONFIG_HEX, };
