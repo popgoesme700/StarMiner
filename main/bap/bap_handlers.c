@@ -7,11 +7,11 @@
 
 #include <string.h>
 #include <stdio.h>
-#include <ctype.h>
 #include <stdlib.h>
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "nvs_config.h"
+#include "global_state.h"
 #include "bap_handlers.h"
 #include "bap_protocol.h"
 #include "bap_uart.h"
@@ -40,7 +40,8 @@ void BAP_parse_message(const char *message) {
     uint32_t current_time = esp_timer_get_time() / 1000;
     if (strcmp(message, last_processed_message) == 0 &&
         (current_time - last_message_time) < 1000) {
-        ESP_LOGW(TAG, "Duplicate message detected, ignoring: %s", message);
+        // Don't echo the body: a SET can carry the Wi-Fi or pool password.
+        ESP_LOGW(TAG, "Duplicate message detected, ignoring");
         return;
     }
 
@@ -232,10 +233,11 @@ void BAP_send_request(bap_parameter_t param, GlobalState *state) {
             BAP_send_message(BAP_CMD_RES, "deviceModel", state->DEVICE_CONFIG.family.name);
             BAP_send_message(BAP_CMD_RES, "asicModel", state->DEVICE_CONFIG.family.asic.name);
             char port_str[6];
-            snprintf(port_str, sizeof(port_str),"%u", state->SYSTEM_MODULE.pool_port);
-            BAP_send_message(BAP_CMD_RES, "pool", state->SYSTEM_MODULE.pool_url);
+            uint16_t prim_idx = state->SYSTEM_MODULE.primary_pool_index;
+            snprintf(port_str, sizeof(port_str),"%u", state->SYSTEM_MODULE.pools[prim_idx].port);
+            BAP_send_message(BAP_CMD_RES, "pool", state->SYSTEM_MODULE.pools[prim_idx].url);
             BAP_send_message(BAP_CMD_RES, "poolPort", port_str);
-            BAP_send_message(BAP_CMD_RES, "poolUser", state->SYSTEM_MODULE.pool_user);
+            BAP_send_message(BAP_CMD_RES, "poolUser", state->SYSTEM_MODULE.pools[prim_idx].user);
             break;
         case BAP_PARAM_SHARES:
             {

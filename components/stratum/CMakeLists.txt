@@ -7,12 +7,12 @@ SRCS
     "coinbase_decoder.c"
     "segwit_addr.c"
     "base58.c"
+    "miner_job.c"
 
 INCLUDE_DIRS
     "include"
 
 REQUIRES
-    "json"
     "mbedtls"
     "app_update"
     "esp_timer"
