@@ -13,7 +13,15 @@
 
 StarMiner ESP-Miner is a firmware fork for StarMiner, a DC 12V Bitaxe-derived open hardware miner design. It is based on the open source ESP-Miner firmware for the [Bitaxe](https://github.com/bitaxeorg/bitaxe) and keeps the AxeOS web interface and ESP-IDF build flow.
 
-For stock Bitaxe hardware, use the upstream [ESP-Miner releases](https://github.com/bitaxeorg/ESP-Miner/releases/latest) and upstream [factory image flashing instructions](https://github.com/bitaxeorg/ESP-Miner/blob/master/flashing.md). For StarMiner DC 12V boards, build and flash images from this fork with the matching `config-601a.cvs` file.
+For stock Bitaxe hardware, use the upstream [ESP-Miner releases](https://github.com/bitaxeorg/ESP-Miner/releases/latest) and upstream [factory image flashing instructions](https://github.com/bitaxeorg/ESP-Miner/blob/master/flashing.md). For StarMiner DC 12V boards, build and flash images from this fork with the matching `config-601a.csv` file.
+
+### Maintaining notes
+Ideally you should keep the FAMILY_GAMMA_V2 define, along with the TPS546_CONFIG_GAMMA_V2 define in TPS546.c, as if you compile for the 601a board it'll use those as the defaults instead of the 5v defaults of the normal gamma 601.
+You *dont* need to use this fork if you prefer not to, with the newer version of the esp-miner firmware, you can pass a config file to configure the TPS546 (which is the only "difference" of the StarMiner varient of this miner).
+I made a custom (its just the normal `./configs/config-601a.csv` with boardversion set to 601 instead of 601a) config that you can pass to the *official* esp-miner firmware at https://github.com/bitaxeorg/ESP-Miner.
+Just flash the normal 601 firmware from that repo with my `./configs/config-601a-spoof.csv` file using bitaxetool, and now you have official firmware. The AxeOS interface *will* call the device bitaxe gamma 601, and Gamma, instead of bitaxe gamma 601a and GammaV2... if you dont care about the *small* changes like that, flashing official firmware with my 601a-spoof config will work perfectly fine.
+
+I may, or may not maintain this fork for the starminer bitaxe gamma 601 specific things such as a default firmware config and ui name changes/boardversion implementations or not... I highly recommend just using the config on the official firmware, there is not *too* much point to use this specific firmware fork, as its just slightly tweaked.
 
 ## StarMiner DC 12V hardware notes
 
