@@ -16,8 +16,6 @@
 #include "esp_transport.h"
 #include "system.h"
 
-typedef struct bm_job bm_job;
-
 typedef struct PoolConfig
 {
     char * url;
@@ -125,6 +123,7 @@ typedef struct SystemModule
 typedef struct SelfTestNonceMeasurement
 {
     bool is_active;
+    uint8_t target[32];
     uint64_t accepted_count;
     uint64_t rejected_count;
     double hashes;
@@ -148,7 +147,7 @@ typedef struct AsicTaskModule
     // ASIC may not return the nonce in the same order as the jobs were sent
     // it also may return a previous nonce under some circumstances
     // so we keep a list of jobs indexed by the job id
-    bm_job **active_jobs;
+    struct asic_job **active_jobs;
     uint8_t *valid_jobs;
     pthread_mutex_t valid_jobs_lock;
 } AsicTaskModule;
