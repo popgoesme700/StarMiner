@@ -5,6 +5,7 @@
  *****************************************************************************/
 
 #include "stratum_api.h"
+#include "stratum_socket.h"
 #include "yyjson.h"
 #include "esp_log.h"
 #include "esp_app_desc.h"
@@ -24,12 +25,8 @@
 #include <time.h>
 #include <sys/param.h>
 
-#define TRANSPORT_TIMEOUT_MS 5000
 #define BUFFER_SIZE 1024
-#define MAX_EXTRANONCE_2_LEN 32
 #define JSON_RPC_BUFFER_LIMIT (STRATUM_V1_MAX_JSON_LINE_SIZE + 2U)
-#define MIN_POOL_DIFFICULTY 0.0001
-#define MAX_POOL_DIFFICULTY 4294967295.0
 #define BITCOIN_GENESIS_NTIME 1231006505
 #define MAX_ERROR_MSG_LEN 256
 static const char * TAG = "stratum_api";
@@ -37,28 +34,6 @@ static const char * TAG = "stratum_api";
 static char * json_rpc_buffer = NULL;
 static size_t json_rpc_buffer_size = 0;
 static size_t json_rpc_buffer_len = 0;
-
-static RequestTiming *request_timings = NULL;
-
-static RequestTiming* get_request_timing(int request_id) {
-    if (request_id < 0) return NULL;
-    int index = request_id % MAX_REQUEST_IDS;
-    return &request_timings[index];
-}
-
-float STRATUM_V1_get_response_time_ms(int request_id, int64_t receive_time_us)
-{
-    if (request_id < 0) return -1.0;
-    
-    RequestTiming *timing = get_request_timing(request_id);
-    if (!timing || !timing->tracking) {
-        return -1.0;
-    }
-    
-    float response_time = (receive_time_us - timing->timestamp_us) / 1000.0f;
-    timing->tracking = false;
-    return response_time;
-}
 
 esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, const char * cert)
 {
@@ -115,25 +90,6 @@ bool STRATUM_V1_initialize_buffer(void)
     }
     json_rpc_buffer_size = BUFFER_SIZE;
     json_rpc_buffer[0] = '\0';
-
-    if (request_timings == NULL) {
-        request_timings = heap_caps_malloc(sizeof(RequestTiming) * MAX_REQUEST_IDS, MALLOC_CAP_SPIRAM);
-        if (request_timings == NULL) {
-            request_timings = malloc(sizeof(RequestTiming) * MAX_REQUEST_IDS);
-        }
-        if (request_timings == NULL) {
-            ESP_LOGE(TAG, "Failed to allocate memory for request_timings");
-            free(json_rpc_buffer);
-            json_rpc_buffer = NULL;
-            json_rpc_buffer_size = 0;
-            return false;
-        }
-    }
-
-    for (int i = 0; i < MAX_REQUEST_IDS; i++) {
-        request_timings[i].timestamp_us = 0;
-        request_timings[i].tracking = false;
-    }
 
     return true;
 }
@@ -809,19 +765,6 @@ bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json, mi
     return result;
 }
 
-
-
-static void stamp_tx(int request_id, uint64_t timestamp_us)
-{
-    if (request_id >= 1) {
-        RequestTiming *timing = get_request_timing(request_id);
-        if (timing) {
-            timing->timestamp_us = timestamp_us;
-            timing->tracking = true;
-        }
-    }
-}
-
 static void debug_stratum_tx(const char * msg)
 {
     char *newline = strchr(msg, '\n');
@@ -843,7 +786,7 @@ int STRATUM_V1_subscribe(esp_transport_handle_t transport, int send_uid, const c
         send_uid, model, version);
     debug_stratum_tx(subscribe_msg);
 
-    return esp_transport_write(transport, subscribe_msg, strlen(subscribe_msg), TRANSPORT_TIMEOUT_MS);
+    return stratum_socket_send_all(transport, subscribe_msg, strlen(subscribe_msg));
 }
 
 int STRATUM_V1_suggest_difficulty(esp_transport_handle_t transport, int send_uid, uint32_t difficulty)
@@ -854,7 +797,7 @@ int STRATUM_V1_suggest_difficulty(esp_transport_handle_t transport, int send_uid
         send_uid, difficulty);
     debug_stratum_tx(difficulty_msg);
 
-    return esp_transport_write(transport, difficulty_msg, strlen(difficulty_msg), TRANSPORT_TIMEOUT_MS);
+    return stratum_socket_send_all(transport, difficulty_msg, strlen(difficulty_msg));
 }
 
 int STRATUM_V1_extranonce_subscribe(esp_transport_handle_t transport, int send_uid)
@@ -865,7 +808,7 @@ int STRATUM_V1_extranonce_subscribe(esp_transport_handle_t transport, int send_u
         send_uid);
     debug_stratum_tx(extranonce_msg);
 
-    return esp_transport_write(transport, extranonce_msg, strlen(extranonce_msg), TRANSPORT_TIMEOUT_MS);
+    return stratum_socket_send_all(transport, extranonce_msg, strlen(extranonce_msg));
 }
 
 int STRATUM_V1_authorize(esp_transport_handle_t transport, int send_uid, const char * username, const char * pass)
@@ -876,7 +819,7 @@ int STRATUM_V1_authorize(esp_transport_handle_t transport, int send_uid, const c
         send_uid, username, pass);
     debug_stratum_tx(authorize_msg);
 
-    return esp_transport_write(transport, authorize_msg, strlen(authorize_msg), TRANSPORT_TIMEOUT_MS);
+    return stratum_socket_send_all(transport, authorize_msg, strlen(authorize_msg));
 }
 
 int STRATUM_V1_pong(esp_transport_handle_t transport, int message_id)
@@ -887,7 +830,7 @@ int STRATUM_V1_pong(esp_transport_handle_t transport, int message_id)
         message_id);
     debug_stratum_tx(pong_msg);
     
-    return esp_transport_write(transport, pong_msg, strlen(pong_msg), TRANSPORT_TIMEOUT_MS);
+    return stratum_socket_send_all(transport, pong_msg, strlen(pong_msg));
 }
 
 int STRATUM_V1_send_version(esp_transport_handle_t transport, int message_id)
@@ -900,7 +843,7 @@ int STRATUM_V1_send_version(esp_transport_handle_t transport, int message_id)
         message_id, version);
     debug_stratum_tx(version_msg);
     
-    return esp_transport_write(transport, version_msg, strlen(version_msg), TRANSPORT_TIMEOUT_MS);
+    return stratum_socket_send_all(transport, version_msg, strlen(version_msg));
 }
 
 /// @param transport Transport to write to
@@ -921,16 +864,11 @@ int STRATUM_V1_submit_share(esp_transport_handle_t transport, int send_uid, cons
         "{\"id\":%d,\"method\":\"mining.submit\",\"params\":[\"%s\",\"%s\",\"%s\",\"%08lx\",\"%08lx\",\"%08lx\"]}\n",
         send_uid, username, job_id, extranonce_2, ntime, nonce, version_bits);
 
-    int ret = esp_transport_write(transport, submit_msg, strlen(submit_msg), TRANSPORT_TIMEOUT_MS);
+    int ret = stratum_socket_send_all(transport, submit_msg, strlen(submit_msg));
 
-    uint64_t now = esp_timer_get_time();
-    if (out_sent_time_us) {
-        *out_sent_time_us = now;
-    }
+    if (out_sent_time_us) *out_sent_time_us = esp_timer_get_time();
 
     debug_stratum_tx(submit_msg);
-    
-    stamp_tx(send_uid, now);
 
     return ret;
 }
@@ -943,7 +881,7 @@ int STRATUM_V1_configure_version_rolling(esp_transport_handle_t transport, int s
         send_uid);
     debug_stratum_tx(configure_msg);
 
-    return esp_transport_write(transport, configure_msg, strlen(configure_msg), TRANSPORT_TIMEOUT_MS);
+    return stratum_socket_send_all(transport, configure_msg, strlen(configure_msg));
 }
 
 stratum_protocol_t stratum_protocol_from_string(const char *s)
